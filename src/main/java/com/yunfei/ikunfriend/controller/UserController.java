@@ -7,19 +7,23 @@ import com.yunfei.ikunfriend.common.ResultUtils;
 import com.yunfei.ikunfriend.common.UserConstant;
 import com.yunfei.ikunfriend.exception.BussinessException;
 import com.yunfei.ikunfriend.model.domain.User;
+import com.yunfei.ikunfriend.model.dto.SearchUserByTagsDto;
 import com.yunfei.ikunfriend.model.dto.UserLoginDto;
 import com.yunfei.ikunfriend.model.dto.UserRegisterDto;
 import com.yunfei.ikunfriend.service.UserService;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/user")
+@CrossOrigin(origins = "http://localhost:5173")
 public class UserController {
 
     @Resource
@@ -109,5 +113,14 @@ public class UserController {
         User user1 = userService.getById(userId);
         User safetyUser = userService.getSafetyUser(user1);
         return ResultUtils.success(safetyUser);
+    }
+
+    @GetMapping("/search/tags")
+    public Result<List<User>> searchUsersByTags(@RequestParam List<String> tagNameList) {
+        if (CollectionUtils.isEmpty(tagNameList)) {
+            throw new BussinessException(Code.PARAMS_ERROR);
+        }
+        List<User> users = userService.searchUsersByTags(tagNameList);
+        return ResultUtils.success(users);
     }
 }
