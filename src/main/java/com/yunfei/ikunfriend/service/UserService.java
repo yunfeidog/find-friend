@@ -19,6 +19,7 @@ public interface UserService extends IService<User> {
 
     /**
      * 用户注册
+     *
      * @param userRegisterDto 用户注册信息
      * @return 用户id
      */
@@ -35,6 +36,7 @@ public interface UserService extends IService<User> {
 
     /**
      * 用户脱敏
+     *
      * @param originalUser
      * @return
      */
@@ -47,5 +49,27 @@ public interface UserService extends IService<User> {
      * @return
      */
     Integer logout(HttpServletRequest request);
+
+
+    /**
+     * 更新用户信息
+     *
+     * @param user
+     * @return
+     */
+    Integer updateUser(User user, User loginUser);
+
+
+    boolean isAdmin(User loginUser);
+    boolean isAdmin(HttpServletRequest request);
+
+
+    /**
+     * 获取当前登录用户信息
+     *
+     * @return
+     */
+    User getLoginUser(HttpServletRequest request);
+
 
 }

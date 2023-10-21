@@ -7,7 +7,6 @@ import com.yunfei.ikunfriend.common.ResultUtils;
 import com.yunfei.ikunfriend.common.UserConstant;
 import com.yunfei.ikunfriend.exception.BussinessException;
 import com.yunfei.ikunfriend.model.domain.User;
-import com.yunfei.ikunfriend.model.dto.SearchUserByTagsDto;
 import com.yunfei.ikunfriend.model.dto.UserLoginDto;
 import com.yunfei.ikunfriend.model.dto.UserRegisterDto;
 import com.yunfei.ikunfriend.service.UserService;
@@ -17,7 +16,6 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -63,7 +61,7 @@ public class UserController {
 
     @GetMapping("/search")
     public Result<List<User>> searchUsers(String username, HttpServletRequest request) {
-        if (!isAdmin(request)) {
+        if (!userService.isAdmin(request)) {
             throw new BussinessException(Code.NO_AUTH);
         }
         QueryWrapper<User> userQueryWrapper = new QueryWrapper<>();
@@ -79,7 +77,7 @@ public class UserController {
 
     @PostMapping("/delete/{id}")
     public Result<Boolean> deleteUser(@PathVariable Long id, HttpServletRequest request) {
-        if (!isAdmin(request)) {
+        if (!userService.isAdmin(request)) {
             throw new BussinessException(Code.NO_AUTH);
         }
         if (id <= 0) {
@@ -89,19 +87,7 @@ public class UserController {
         return ResultUtils.success(flag);
     }
 
-    /**
-     * 判断是不是管理员
-     *
-     * @return
-     */
-    private boolean isAdmin(HttpServletRequest request) {
-        //仅管理员可以查询
-        User user = (User) request.getSession().getAttribute(UserConstant.USER_LOGIN_STATE);
-        if (user == null || user.getUserRole() != UserConstant.ADMIN_USER_ROLE) {
-            return false;
-        }
-        return true;
-    }
+
 
     @GetMapping("/current")
     public Result<User> gerCurrentUser(HttpServletRequest request) {
@@ -122,5 +108,15 @@ public class UserController {
         }
         List<User> users = userService.searchUsersByTags(tagNameList);
         return ResultUtils.success(users);
+    }
+
+    @PostMapping("/update")
+    public Result<Integer> updateUser(@RequestBody User user, HttpServletRequest request) {
+        if (user == null) {
+            throw new BussinessException(Code.PARAMS_ERROR);
+        }
+        User loginUser = userService.getLoginUser(request);
+        Integer flag = userService.updateUser(user, loginUser);
+        return ResultUtils.success(flag);
     }
 }

@@ -221,6 +221,53 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         request.getSession().removeAttribute(UserConstant.USER_LOGIN_STATE);
         return 1;
     }
+
+    @Override
+    public Integer updateUser(User user, User loginUser) {
+        Long userId = user.getId();
+        if (userId <= 0) {
+            throw new BussinessException(Code.PARAMS_ERROR);
+        }
+        //如果是管理员，允许更新任意用户
+        //如果是普通用户，只能更新自己的信息
+        if (!isAdmin(loginUser) && !userId.equals(loginUser.getId())) {
+            throw new BussinessException(Code.NO_AUTH);
+        }
+        User oldUser = userMapper.selectById(userId);
+        if (oldUser == null) {
+            throw new BussinessException(Code.PARAMS_ERROR);
+        }
+        return userMapper.updateById(user);
+    }
+
+    /**
+     * 判断是不是管理员
+     *
+     * @return
+     */
+    @Override
+    public boolean isAdmin(HttpServletRequest request) {
+        //仅管理员可以查询
+        User user = (User) request.getSession().getAttribute(UserConstant.USER_LOGIN_STATE);
+        if (user == null || user.getUserRole() != UserConstant.ADMIN_USER_ROLE) {
+            return false;
+        }
+        return true;
+    }
+
+    @Override
+    public boolean isAdmin(User loginUser) {
+        return loginUser != null && loginUser.getUserRole() == UserConstant.ADMIN_USER_ROLE;
+    }
+
+    @Override
+    public User getLoginUser(HttpServletRequest request) {
+        if (request == null) {
+            throw new BussinessException(Code.NOT_LOGIN);
+        }
+        Object attribute = request.getSession().getAttribute(UserConstant.USER_LOGIN_STATE);
+        return (User) attribute;
+    }
 }
 
 
