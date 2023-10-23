@@ -3,7 +3,7 @@ spring:
     name: ikun-friend
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/qiuzhao
+    url: jdbc:mysql://localhost:3306/qiuzhao?ServerTimezone=Asia/Shanghai
     username: root
     password: 12345678
   session:
