@@ -1,6 +1,7 @@
 package com.yunfei.ikunfriend.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.yunfei.ikunfriend.common.Code;
 import com.yunfei.ikunfriend.common.Result;
 import com.yunfei.ikunfriend.common.ResultUtils;
@@ -10,22 +11,30 @@ import com.yunfei.ikunfriend.model.domain.User;
 import com.yunfei.ikunfriend.model.dto.UserLoginDto;
 import com.yunfei.ikunfriend.model.dto.UserRegisterDto;
 import com.yunfei.ikunfriend.service.UserService;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/user")
 @CrossOrigin(origins = "http://localhost:5173")
+@Slf4j
 public class UserController {
 
     @Resource
     private UserService userService;
+
+    @Resource
+    private RedisTemplate redisTemplate;
 
     @PostMapping("/register")
     public Result<Long> userRegister(@RequestBody UserRegisterDto userRegisterDto) {
@@ -88,7 +97,6 @@ public class UserController {
     }
 
 
-
     @GetMapping("/current")
     public Result<User> gerCurrentUser(HttpServletRequest request) {
         User user = (User) request.getSession().getAttribute(UserConstant.USER_LOGIN_STATE);
@@ -118,5 +126,25 @@ public class UserController {
         User loginUser = userService.getLoginUser(request);
         Integer flag = userService.updateUser(user, loginUser);
         return ResultUtils.success(flag);
+    }
+
+    @GetMapping("/recommend")
+    public Result<Page<User>> recommendUser(int pageSize, int pageNum, HttpServletRequest request) {
+        User loginUser = userService.getLoginUser(request);
+        String redisKey=String.format("ikun:user:recommend:%s",loginUser.getId());
+        ValueOperations valueOperations = redisTemplate.opsForValue();
+        Page<User> userPage = (Page<User>) valueOperations.get(redisKey);
+        if (userPage!=null){
+            log.info("get recommend user from redis");
+            return ResultUtils.success(userPage);
+        }
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        Page<User> userList = userService.page(new Page<>(pageNum, pageSize), queryWrapper);
+        try {
+            valueOperations.set(redisKey,userList,30, TimeUnit.MINUTES);
+        } catch (Exception e) {
+            log.error("redis set error:{}",e.getMessage());
+        }
+        return ResultUtils.success(userList);
     }
 }

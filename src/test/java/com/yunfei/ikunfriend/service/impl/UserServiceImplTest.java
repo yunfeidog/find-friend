@@ -20,4 +20,18 @@ class UserServiceImplTest {
         List<String> tagNameList = Arrays.asList("java", "python");
         List<User> users = userService.searchUsersByTags(tagNameList);
     }
+
+
+    @Test
+    void test() {
+
+        //List<String> ls=new ArrayList<>();
+        //ls.add("cxk");
+        //System.out.println("list:"+ls);
+        //
+        //RList<String> list = redissonClient.getList("test-list");
+        //list.add("cxk");
+        //System.out.println("redis:"+list);
+        //list.get(0);
+    }
 }
