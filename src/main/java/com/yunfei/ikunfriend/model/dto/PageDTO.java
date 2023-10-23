@@ -5,7 +5,7 @@ import lombok.Data;
 import java.io.Serializable;
 
 @Data
-public class PageDto implements Serializable {
+public class PageDTO implements Serializable {
     /**
      * 每页条数
      */

@@ -7,7 +7,8 @@ public enum Code {
 
     SUCCESS(0, "ok", ""),
     PARAMS_ERROR(40000, "请求参数错误", ""),
-    PARAMS_NULL_ERROR(40001,"请求参数为空",""),
+    PARAMS_NULL_ERROR(40001, "请求参数为空", ""),
+    NULL_ERROR(40002, "空指针异常", ""),
 
     NO_AUTH(40100, "没有权限", ""),
     NOT_LOGIN(40101, "未登录", ""),

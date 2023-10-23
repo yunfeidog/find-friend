@@ -8,8 +8,8 @@ import com.yunfei.ikunfriend.common.ResultUtils;
 import com.yunfei.ikunfriend.common.UserConstant;
 import com.yunfei.ikunfriend.exception.BussinessException;
 import com.yunfei.ikunfriend.model.domain.User;
-import com.yunfei.ikunfriend.model.dto.UserLoginDto;
-import com.yunfei.ikunfriend.model.dto.UserRegisterDto;
+import com.yunfei.ikunfriend.model.dto.UserLoginDTO;
+import com.yunfei.ikunfriend.model.dto.UserRegisterDTO;
 import com.yunfei.ikunfriend.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -37,7 +37,7 @@ public class UserController {
     private RedisTemplate redisTemplate;
 
     @PostMapping("/register")
-    public Result<Long> userRegister(@RequestBody UserRegisterDto userRegisterDto) {
+    public Result<Long> userRegister(@RequestBody UserRegisterDTO userRegisterDto) {
         if (userRegisterDto == null) {
             throw new BussinessException(Code.PARAMS_ERROR);
         }
@@ -46,7 +46,7 @@ public class UserController {
     }
 
     @PostMapping("/login")
-    public Result<User> userLogin(@RequestBody UserLoginDto userLoginDto, HttpServletRequest request) {
+    public Result<User> userLogin(@RequestBody UserLoginDTO userLoginDto, HttpServletRequest request) {
         if (userLoginDto == null) {
             throw new BussinessException(Code.PARAMS_ERROR);
         }

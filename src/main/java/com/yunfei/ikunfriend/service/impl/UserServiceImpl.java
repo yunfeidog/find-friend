@@ -8,8 +8,8 @@ import com.yunfei.ikunfriend.common.Code;
 import com.yunfei.ikunfriend.common.UserConstant;
 import com.yunfei.ikunfriend.exception.BussinessException;
 import com.yunfei.ikunfriend.model.domain.User;
-import com.yunfei.ikunfriend.model.dto.UserLoginDto;
-import com.yunfei.ikunfriend.model.dto.UserRegisterDto;
+import com.yunfei.ikunfriend.model.dto.UserLoginDTO;
+import com.yunfei.ikunfriend.model.dto.UserRegisterDTO;
 import com.yunfei.ikunfriend.service.UserService;
 import com.yunfei.ikunfriend.mapper.UserMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -96,7 +96,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
 
     @Override
-    public long userRegister(UserRegisterDto userRegisterDto) {
+    public long userRegister(UserRegisterDTO userRegisterDto) {
         String userAccount = userRegisterDto.getUserAccount();
         String userPassword = userRegisterDto.getUserPassword();
         String checkPassword = userRegisterDto.getCheckPassword();
@@ -156,7 +156,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     }
 
     @Override
-    public User userLogin(UserLoginDto userLoginDto, HttpServletRequest request) {
+    public User userLogin(UserLoginDTO userLoginDto, HttpServletRequest request) {
         String userAccount = userLoginDto.getUserAccount();
         String userPassword = userLoginDto.getUserPassword();
         if (StringUtils.isAnyBlank(userAccount, userPassword)) {

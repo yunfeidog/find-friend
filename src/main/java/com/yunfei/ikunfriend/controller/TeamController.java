@@ -8,8 +8,11 @@ import com.yunfei.ikunfriend.common.ResultUtils;
 import com.yunfei.ikunfriend.exception.BussinessException;
 import com.yunfei.ikunfriend.model.domain.Team;
 import com.yunfei.ikunfriend.model.domain.User;
-import com.yunfei.ikunfriend.model.dto.TeamAddDto;
-import com.yunfei.ikunfriend.model.dto.TeamQueryDto;
+import com.yunfei.ikunfriend.model.dto.TeamAddDTO;
+import com.yunfei.ikunfriend.model.dto.TeamJoinDTO;
+import com.yunfei.ikunfriend.model.dto.TeamQueryDTO;
+import com.yunfei.ikunfriend.model.dto.TeamUpdateDTO;
+import com.yunfei.ikunfriend.model.vo.TeamUserVO;
 import com.yunfei.ikunfriend.service.TeamService;
 import com.yunfei.ikunfriend.service.UserService;
 import lombok.extern.slf4j.Slf4j;
@@ -37,7 +40,7 @@ public class TeamController {
     private RedisTemplate redisTemplate;
 
     @PostMapping("/add")
-    public Result<Long> addTeam(@RequestBody TeamAddDto teamAddDto, HttpServletRequest request) {
+    public Result<Long> addTeam(@RequestBody TeamAddDTO teamAddDto, HttpServletRequest request) {
         if (teamAddDto == null) {
             throw new BussinessException(Code.PARAMS_ERROR);
         }
@@ -64,11 +67,12 @@ public class TeamController {
     }
 
     @PostMapping("/update")
-    public Result<Boolean> updateTeam(@RequestBody Team team) {
+    public Result<Boolean> updateTeam(@RequestBody TeamUpdateDTO team,HttpServletRequest request) {
         if (team == null) {
             throw new BussinessException(Code.PARAMS_ERROR);
         }
-        boolean b = teamService.updateById(team);
+        User loginUser = userService.getLoginUser(request);
+        boolean b = teamService.updateTeam(team,loginUser);
         if (!b) {
             throw new BussinessException(Code.SYSTEM_ERROR, "更新队伍失败");
         }
@@ -88,23 +92,17 @@ public class TeamController {
     }
 
     @GetMapping("/list")
-    public Result<List<Team>> listTeam(TeamQueryDto teamQueryDto) {
+    public Result<List<TeamUserVO>> listTeams(TeamQueryDTO teamQueryDto, HttpServletRequest request) {
         if (teamQueryDto == null) {
             throw new BussinessException(Code.PARAMS_ERROR);
         }
-        Team team = new Team();
-        BeanUtils.copyProperties(teamQueryDto, team);
-        QueryWrapper<Team> queryWrapper = new QueryWrapper<>();
-
-        List<Team> teamList = teamService.list(queryWrapper);
-        if (teamList == null) {
-            throw new BussinessException(Code.SYSTEM_ERROR, "获取队伍列表失败");
-        }
+        User loginUser = userService.getLoginUser(request);
+        List<TeamUserVO> teamList = teamService.listTeams(teamQueryDto,userService.isAdmin(loginUser));
         return ResultUtils.success(teamList);
     }
 
     @GetMapping("/list/page")
-    public Result<Page<Team>> listTeamsByPage(TeamQueryDto teamQueryDto) {
+    public Result<Page<Team>> listTeamsByPage(TeamQueryDTO teamQueryDto) {
         if (teamQueryDto == null) {
             throw new BussinessException(Code.PARAMS_ERROR);
         }
@@ -116,5 +114,16 @@ public class TeamController {
         return ResultUtils.success(teamPage);
     }
 
-
+    @PostMapping("/join")
+    public Result<Boolean> joinTeam(@RequestBody TeamJoinDTO teamJoinDTO,HttpServletRequest request){
+        if (teamJoinDTO == null) {
+            throw new BussinessException(Code.PARAMS_ERROR);
+        }
+        User loginUser = userService.getLoginUser(request);
+        boolean b = teamService.joinTeam(teamJoinDTO,loginUser);
+        if (!b) {
+            throw new BussinessException(Code.SYSTEM_ERROR, "加入队伍失败");
+        }
+        return ResultUtils.success(b);
+    }
 }

@@ -5,6 +5,6 @@ import lombok.Data;
 import java.util.List;
 
 @Data
-public class SearchUserByTagsDto {
+public class SearchUserByTagsDTO {
     private List<String> tagNameList;
 }

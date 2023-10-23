@@ -2,8 +2,8 @@ package com.yunfei.ikunfriend.service;
 
 import com.yunfei.ikunfriend.model.domain.User;
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.yunfei.ikunfriend.model.dto.UserLoginDto;
-import com.yunfei.ikunfriend.model.dto.UserRegisterDto;
+import com.yunfei.ikunfriend.model.dto.UserLoginDTO;
+import com.yunfei.ikunfriend.model.dto.UserRegisterDTO;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.List;
@@ -23,7 +23,7 @@ public interface UserService extends IService<User> {
      * @param userRegisterDto 用户注册信息
      * @return 用户id
      */
-    long userRegister(UserRegisterDto userRegisterDto);
+    long userRegister(UserRegisterDTO userRegisterDto);
 
     /**
      * 用户登录
@@ -32,7 +32,7 @@ public interface UserService extends IService<User> {
      * @param request
      * @return 脱敏后的用户信息
      */
-    User userLogin(UserLoginDto userLoginDto, HttpServletRequest request);
+    User userLogin(UserLoginDTO userLoginDto, HttpServletRequest request);
 
     /**
      * 用户脱敏

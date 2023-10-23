@@ -6,7 +6,7 @@ import lombok.EqualsAndHashCode;
 @Data
 @EqualsAndHashCode(callSuper = true)
 // callSuper = true表示在生成的equals和hashCode方法中调用父类的equals和hashCode方法
-public class TeamQueryDto extends PageDto {
+public class TeamQueryDTO extends PageDTO {
 
     private Long id;
     private String name;
@@ -18,5 +18,7 @@ public class TeamQueryDto extends PageDto {
     private Long userId;
 
     private Integer status;
+
+    private String searchText;
 
 }

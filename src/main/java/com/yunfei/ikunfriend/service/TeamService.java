@@ -3,6 +3,12 @@ package com.yunfei.ikunfriend.service;
 import com.yunfei.ikunfriend.model.domain.Team;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.yunfei.ikunfriend.model.domain.User;
+import com.yunfei.ikunfriend.model.dto.TeamJoinDTO;
+import com.yunfei.ikunfriend.model.dto.TeamQueryDTO;
+import com.yunfei.ikunfriend.model.dto.TeamUpdateDTO;
+import com.yunfei.ikunfriend.model.vo.TeamUserVO;
+
+import java.util.List;
 
 /**
  * @author houyunfei
@@ -19,4 +25,29 @@ public interface TeamService extends IService<Team> {
      */
     long addTeam(Team team, User loginUser);
 
+    /**
+     * 搜索队伍
+     *
+     * @param teamQueryDto
+     * @param isAdmin
+     * @return
+     */
+    List<TeamUserVO> listTeams(TeamQueryDTO teamQueryDto, boolean isAdmin);
+
+    /**
+     * 更新队伍
+     *
+     * @param team
+     * @return
+     */
+    boolean updateTeam(TeamUpdateDTO teamUpdateDTO, User loginUser);
+
+    /**
+     * 加入队伍
+     *
+     * @param teamJoinDTO
+     * @param loginUser
+     * @return
+     */
+    boolean joinTeam(TeamJoinDTO teamJoinDTO, User loginUser);
 }
