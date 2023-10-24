@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.yunfei.ikunfriend.model.domain.User;
 import com.yunfei.ikunfriend.model.dto.TeamJoinDTO;
 import com.yunfei.ikunfriend.model.dto.TeamQueryDTO;
+import com.yunfei.ikunfriend.model.dto.TeamQuitDTO;
 import com.yunfei.ikunfriend.model.dto.TeamUpdateDTO;
 import com.yunfei.ikunfriend.model.vo.TeamUserVO;
 
@@ -50,4 +51,14 @@ public interface TeamService extends IService<Team> {
      * @return
      */
     boolean joinTeam(TeamJoinDTO teamJoinDTO, User loginUser);
+
+    boolean quitTeam(TeamQuitDTO teamQuitDTO, User loginUser);
+
+    /**
+     * 删除（解散）队伍
+     * @param id
+     * @param loginUser
+     * @return
+     */
+    boolean deleteTeam(long id, User loginUser);
 }

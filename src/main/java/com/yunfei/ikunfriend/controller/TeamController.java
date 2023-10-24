@@ -8,13 +8,11 @@ import com.yunfei.ikunfriend.common.ResultUtils;
 import com.yunfei.ikunfriend.exception.BussinessException;
 import com.yunfei.ikunfriend.model.domain.Team;
 import com.yunfei.ikunfriend.model.domain.User;
-import com.yunfei.ikunfriend.model.dto.TeamAddDTO;
-import com.yunfei.ikunfriend.model.dto.TeamJoinDTO;
-import com.yunfei.ikunfriend.model.dto.TeamQueryDTO;
-import com.yunfei.ikunfriend.model.dto.TeamUpdateDTO;
+import com.yunfei.ikunfriend.model.dto.*;
 import com.yunfei.ikunfriend.model.vo.TeamUserVO;
 import com.yunfei.ikunfriend.service.TeamService;
 import com.yunfei.ikunfriend.service.UserService;
+import com.yunfei.ikunfriend.service.UserTeamService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -37,6 +35,9 @@ public class TeamController {
     private TeamService teamService;
 
     @Resource
+    private UserTeamService userTeamService;
+
+    @Resource
     private RedisTemplate redisTemplate;
 
     @PostMapping("/add")
@@ -54,12 +55,18 @@ public class TeamController {
         return ResultUtils.success(team.getId());
     }
 
+    /**
+     * 解散队伍
+     * @param id
+     * @return
+     */
     @PostMapping("/delete")
-    public Result<Boolean> deleteTeam(@RequestBody long id) {
+    public Result<Boolean> deleteTeam(@RequestBody long id,HttpServletRequest request) {
         if (id <= 0) {
             throw new BussinessException(Code.PARAMS_ERROR);
         }
-        boolean b = teamService.removeById(id);
+        User loginUser = userService.getLoginUser(request);
+        boolean b = teamService.deleteTeam(id,loginUser);
         if (!b) {
             throw new BussinessException(Code.SYSTEM_ERROR, "删除队伍失败");
         }
@@ -91,15 +98,34 @@ public class TeamController {
         return ResultUtils.success(team);
     }
 
+    /**
+     * 我创建的
+     * @param teamQueryDto
+     * @param request
+     * @return
+     */
+    @GetMapping("/list/my")
+    public Result<List<TeamUserVO>> listMyTeams(TeamQueryDTO teamQueryDto, HttpServletRequest request) {
+        if (teamQueryDto == null) {
+            throw new BussinessException(Code.PARAMS_ERROR);
+        }
+        User loginUser = userService.getLoginUser(request);
+        teamQueryDto.setUserId(loginUser.getId());
+        List<TeamUserVO> teamList = teamService.listTeams(teamQueryDto,true);
+        return ResultUtils.success(teamList);
+    }
+
     @GetMapping("/list")
     public Result<List<TeamUserVO>> listTeams(TeamQueryDTO teamQueryDto, HttpServletRequest request) {
         if (teamQueryDto == null) {
             throw new BussinessException(Code.PARAMS_ERROR);
         }
         User loginUser = userService.getLoginUser(request);
-        List<TeamUserVO> teamList = teamService.listTeams(teamQueryDto,userService.isAdmin(loginUser));
+        teamQueryDto.setUserId(loginUser.getId());
+        List<TeamUserVO> teamList = teamService.listTeams(teamQueryDto,true);
         return ResultUtils.success(teamList);
     }
+
 
     @GetMapping("/list/page")
     public Result<Page<Team>> listTeamsByPage(TeamQueryDTO teamQueryDto) {
@@ -121,6 +147,19 @@ public class TeamController {
         }
         User loginUser = userService.getLoginUser(request);
         boolean b = teamService.joinTeam(teamJoinDTO,loginUser);
+        if (!b) {
+            throw new BussinessException(Code.SYSTEM_ERROR, "加入队伍失败");
+        }
+        return ResultUtils.success(b);
+    }
+
+    @PostMapping("/quit")
+    public Result<Boolean> quitTeam(@RequestBody TeamQuitDTO teamQuitDTO, HttpServletRequest request){
+        if (teamQuitDTO == null) {
+            throw new BussinessException(Code.PARAMS_ERROR);
+        }
+        User loginUser = userService.getLoginUser(request);
+        boolean b = teamService.quitTeam(teamQuitDTO,loginUser);
         if (!b) {
             throw new BussinessException(Code.SYSTEM_ERROR, "加入队伍失败");
         }

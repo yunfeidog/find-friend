@@ -11,6 +11,7 @@ import com.yunfei.ikunfriend.model.domain.User;
 import com.yunfei.ikunfriend.model.domain.UserTeam;
 import com.yunfei.ikunfriend.model.dto.TeamJoinDTO;
 import com.yunfei.ikunfriend.model.dto.TeamQueryDTO;
+import com.yunfei.ikunfriend.model.dto.TeamQuitDTO;
 import com.yunfei.ikunfriend.model.dto.TeamUpdateDTO;
 import com.yunfei.ikunfriend.model.vo.TeamUserVO;
 import com.yunfei.ikunfriend.model.vo.UserVO;
@@ -18,7 +19,6 @@ import com.yunfei.ikunfriend.service.TeamService;
 import com.yunfei.ikunfriend.service.UserService;
 import com.yunfei.ikunfriend.service.UserTeamService;
 import lombok.extern.slf4j.Slf4j;
-import lombok.val;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
@@ -26,10 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * @author houyunfei
@@ -205,7 +202,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
         if (oldTeam == null) {
             throw new BussinessException(Code.PARAMS_ERROR);
         }
-        if (oldTeam.getUserId() != loginUser.getId() && !userService.isAdmin(loginUser)) {
+        if (!Objects.equals(oldTeam.getUserId(), loginUser.getId()) && !userService.isAdmin(loginUser)) {
             throw new BussinessException(Code.NO_AUTH, "只能修改自己创建的队伍");
         }
         if (oldTeam.getStatus().equals(TeamStatusEnum.PASSWORD)) {
@@ -233,13 +230,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
             throw new BussinessException(Code.PARAMS_ERROR, "最多创建和加入五个队伍");
         }
         Long teamId = teamJoinDTO.getTeamId();
-        if (teamId == null || teamId <= 0) {
-            throw new BussinessException(Code.PARAMS_ERROR);
-        }
-        Team team = this.getById(teamId);
-        if (team == null) {
-            throw new BussinessException(Code.PARAMS_ERROR, "队伍不存在");
-        }
+        Team team = getTeamById(teamId);
         if (team.getExpireTime() != null && team.getExpireTime().before(new Date())) {
             throw new BussinessException(Code.PARAMS_ERROR, "队伍已过期");
         }
@@ -276,6 +267,91 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
         userTeam.setTeamId(teamId);
         userTeam.setJoinTime(new Date());
         return userTeamService.save(userTeam);
+    }
+
+    private Team getTeamById(Long teamId) {
+        if (teamId == null || teamId <= 0) {
+            throw new BussinessException(Code.PARAMS_ERROR);
+        }
+        Team team = this.getById(teamId);
+        if (team == null) {
+            throw new BussinessException(Code.PARAMS_ERROR, "队伍不存在");
+        }
+        return team;
+    }
+
+    private long countTeamUserByTeamId(long teamId) {
+        QueryWrapper<UserTeam> userTeamQueryWrapper = new QueryWrapper<>();
+        userTeamQueryWrapper.eq("teamId", teamId);
+        return userTeamService.count(userTeamQueryWrapper);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean quitTeam(TeamQuitDTO teamQuitDTO, User loginUser) {
+        if (teamQuitDTO == null) {
+            throw new BussinessException(Code.PARAMS_ERROR);
+        }
+        long teamId = teamQuitDTO.getTeamId();
+        Team team = getTeamById(teamId);
+        long userId = loginUser.getId();
+        UserTeam queryUserTeam = new UserTeam();
+        queryUserTeam.setTeamId(teamId);
+        queryUserTeam.setUserId(userId);
+        QueryWrapper<UserTeam> userTeamQueryWrapper = new QueryWrapper<>(queryUserTeam);
+        long count = userTeamService.count(userTeamQueryWrapper);
+        if (count == 0) {
+            throw new BussinessException(Code.PARAMS_ERROR, "未加入队伍");
+        }
+        long teamHasJoinNum = countTeamUserByTeamId(teamId);
+        if (teamHasJoinNum == 1) {
+            //如果队伍只有一个人，直接删除队伍
+            return this.removeById(teamId);
+        } else {
+            //如果队伍有多个人
+            if (team.getUserId() == userId) {
+                //如果是队长，把队伍给最早加入的用户
+                QueryWrapper<UserTeam> userTeamQueryWrapper1 = new QueryWrapper<>();
+                userTeamQueryWrapper1.eq("teamId", teamId);
+                userTeamQueryWrapper1.last("order by id asc limit 2");
+                List<UserTeam> userTeamList = userTeamService.list(userTeamQueryWrapper1);
+                if (CollectionUtils.isEmpty(userTeamList) || userTeamList.size() < 2) {
+                    throw new BussinessException(Code.SYSTEM_ERROR, "队伍异常");
+                }
+                UserTeam nextUserTeam = userTeamList.get(1);
+                Long nextUserTeamUserId = nextUserTeam.getUserId();
+                //更新队伍的队长
+                Team updateTeam = new Team();
+                updateTeam.setId(teamId);
+                updateTeam.setUserId(nextUserTeamUserId);
+                boolean result = this.updateById(updateTeam);
+                if (!result) {
+                    throw new BussinessException(Code.SYSTEM_ERROR, "更新队伍队长失败");
+                }
+            }
+        }
+        //删除用户=>队伍关系到关系表
+        return userTeamService.remove(userTeamQueryWrapper);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean deleteTeam(long id, User loginUser) {
+        Team team = getTeamById(id);
+        Long teamId = team.getId();
+        //只有队长才可以删除队伍
+        if (!Objects.equals(team.getUserId(), loginUser.getId())) {
+            throw new BussinessException(Code.NO_AUTH, "只有队长才可以删除队伍");
+        }
+        //移除所有加入队伍的关联信息
+        QueryWrapper<UserTeam> userTeamQueryWrapper = new QueryWrapper<>();
+        userTeamQueryWrapper.eq("teamId", teamId);
+        boolean remove = userTeamService.remove(userTeamQueryWrapper);
+        if (!remove) {
+            throw new BussinessException(Code.SYSTEM_ERROR, "删除队伍失败");
+        }
+        //删除队伍
+        return this.removeById(teamId);
     }
 }
 
