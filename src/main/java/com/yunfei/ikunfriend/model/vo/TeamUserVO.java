@@ -9,7 +9,6 @@ import java.util.List;
 @Data
 public class TeamUserVO  implements Serializable {
 
-    List<UserVO> userlist;
 
     private Long id;
 

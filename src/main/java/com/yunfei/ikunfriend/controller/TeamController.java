@@ -8,6 +8,7 @@ import com.yunfei.ikunfriend.common.ResultUtils;
 import com.yunfei.ikunfriend.exception.BussinessException;
 import com.yunfei.ikunfriend.model.domain.Team;
 import com.yunfei.ikunfriend.model.domain.User;
+import com.yunfei.ikunfriend.model.domain.UserTeam;
 import com.yunfei.ikunfriend.model.dto.*;
 import com.yunfei.ikunfriend.model.vo.TeamUserVO;
 import com.yunfei.ikunfriend.service.TeamService;
@@ -20,7 +21,10 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/team")
@@ -57,16 +61,21 @@ public class TeamController {
 
     /**
      * 解散队伍
+     *
      * @param id
      * @return
      */
     @PostMapping("/delete")
-    public Result<Boolean> deleteTeam(@RequestBody long id,HttpServletRequest request) {
+    public Result<Boolean> deleteTeam(@RequestBody DeleteDTO deleteDTO, HttpServletRequest request) {
+        if (deleteDTO == null) {
+            throw new BussinessException(Code.PARAMS_ERROR);
+        }
+        Long id = deleteDTO.getId();
         if (id <= 0) {
             throw new BussinessException(Code.PARAMS_ERROR);
         }
         User loginUser = userService.getLoginUser(request);
-        boolean b = teamService.deleteTeam(id,loginUser);
+        boolean b = teamService.deleteTeam(id, loginUser);
         if (!b) {
             throw new BussinessException(Code.SYSTEM_ERROR, "删除队伍失败");
         }
@@ -74,12 +83,12 @@ public class TeamController {
     }
 
     @PostMapping("/update")
-    public Result<Boolean> updateTeam(@RequestBody TeamUpdateDTO team,HttpServletRequest request) {
+    public Result<Boolean> updateTeam(@RequestBody TeamUpdateDTO team, HttpServletRequest request) {
         if (team == null) {
             throw new BussinessException(Code.PARAMS_ERROR);
         }
         User loginUser = userService.getLoginUser(request);
-        boolean b = teamService.updateTeam(team,loginUser);
+        boolean b = teamService.updateTeam(team, loginUser);
         if (!b) {
             throw new BussinessException(Code.SYSTEM_ERROR, "更新队伍失败");
         }
@@ -99,21 +108,48 @@ public class TeamController {
     }
 
     /**
-     * 我创建的
+     * 获取我创建的队伍
+     *
      * @param teamQueryDto
      * @param request
      * @return
      */
-    @GetMapping("/list/my")
-    public Result<List<TeamUserVO>> listMyTeams(TeamQueryDTO teamQueryDto, HttpServletRequest request) {
+    @GetMapping("/list/my/create")
+    public Result<List<TeamUserVO>> listMyCreateTeams(TeamQueryDTO teamQueryDto, HttpServletRequest request) {
         if (teamQueryDto == null) {
             throw new BussinessException(Code.PARAMS_ERROR);
         }
         User loginUser = userService.getLoginUser(request);
         teamQueryDto.setUserId(loginUser.getId());
-        List<TeamUserVO> teamList = teamService.listTeams(teamQueryDto,true);
+        List<TeamUserVO> teamList = teamService.listTeams(teamQueryDto, true);
         return ResultUtils.success(teamList);
     }
+
+    /**
+     * 获取我加入的队伍
+     *
+     * @param teamQueryDto
+     * @param request
+     * @return
+     */
+    @GetMapping("/list/my/join")
+    public Result<List<TeamUserVO>> listMyJoinTeams(TeamQueryDTO teamQueryDto, HttpServletRequest request) {
+        if (teamQueryDto == null) {
+            throw new BussinessException(Code.PARAMS_ERROR);
+        }
+        User loginUser = userService.getLoginUser(request);
+
+        QueryWrapper<UserTeam> userTeamQueryWrapper = new QueryWrapper<>();
+        userTeamQueryWrapper.eq("userId", loginUser.getId());
+        List<UserTeam> userTeamList = userTeamService.list(userTeamQueryWrapper);
+        //取出不重复的队伍id teamId(单)=>userId(多)
+        Map<Long, List<UserTeam>> listMap = userTeamList.stream().collect(Collectors.groupingBy(UserTeam::getTeamId));
+        List<Long> idList = new ArrayList<>(listMap.keySet());
+        teamQueryDto.setIdList(idList);
+        List<TeamUserVO> teamList = teamService.listTeams(teamQueryDto, true);
+        return ResultUtils.success(teamList);
+    }
+
 
     @GetMapping("/list")
     public Result<List<TeamUserVO>> listTeams(TeamQueryDTO teamQueryDto, HttpServletRequest request) {
@@ -122,7 +158,7 @@ public class TeamController {
         }
         User loginUser = userService.getLoginUser(request);
         teamQueryDto.setUserId(loginUser.getId());
-        List<TeamUserVO> teamList = teamService.listTeams(teamQueryDto,true);
+        List<TeamUserVO> teamList = teamService.listTeams(teamQueryDto, true);
         return ResultUtils.success(teamList);
     }
 
@@ -141,12 +177,12 @@ public class TeamController {
     }
 
     @PostMapping("/join")
-    public Result<Boolean> joinTeam(@RequestBody TeamJoinDTO teamJoinDTO,HttpServletRequest request){
+    public Result<Boolean> joinTeam(@RequestBody TeamJoinDTO teamJoinDTO, HttpServletRequest request) {
         if (teamJoinDTO == null) {
             throw new BussinessException(Code.PARAMS_ERROR);
         }
         User loginUser = userService.getLoginUser(request);
-        boolean b = teamService.joinTeam(teamJoinDTO,loginUser);
+        boolean b = teamService.joinTeam(teamJoinDTO, loginUser);
         if (!b) {
             throw new BussinessException(Code.SYSTEM_ERROR, "加入队伍失败");
         }
@@ -154,12 +190,12 @@ public class TeamController {
     }
 
     @PostMapping("/quit")
-    public Result<Boolean> quitTeam(@RequestBody TeamQuitDTO teamQuitDTO, HttpServletRequest request){
+    public Result<Boolean> quitTeam(@RequestBody TeamQuitDTO teamQuitDTO, HttpServletRequest request) {
         if (teamQuitDTO == null) {
             throw new BussinessException(Code.PARAMS_ERROR);
         }
         User loginUser = userService.getLoginUser(request);
-        boolean b = teamService.quitTeam(teamQuitDTO,loginUser);
+        boolean b = teamService.quitTeam(teamQuitDTO, loginUser);
         if (!b) {
             throw new BussinessException(Code.SYSTEM_ERROR, "加入队伍失败");
         }

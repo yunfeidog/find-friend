@@ -72,4 +72,5 @@ public interface UserService extends IService<User> {
     User getLoginUser(HttpServletRequest request);
 
 
+    List<User> matchUsers(long num, User loginUser);
 }

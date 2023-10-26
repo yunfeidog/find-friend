@@ -7,11 +7,12 @@ import com.google.gson.reflect.TypeToken;
 import com.yunfei.ikunfriend.common.Code;
 import com.yunfei.ikunfriend.common.UserConstant;
 import com.yunfei.ikunfriend.exception.BussinessException;
+import com.yunfei.ikunfriend.mapper.UserMapper;
 import com.yunfei.ikunfriend.model.domain.User;
 import com.yunfei.ikunfriend.model.dto.UserLoginDTO;
 import com.yunfei.ikunfriend.model.dto.UserRegisterDTO;
 import com.yunfei.ikunfriend.service.UserService;
-import com.yunfei.ikunfriend.mapper.UserMapper;
+import com.yunfei.ikunfriend.utils.AlgorithmUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -20,10 +21,7 @@ import org.springframework.util.DigestUtils;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -265,11 +263,38 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         if (request == null) {
             throw new BussinessException(Code.NOT_LOGIN);
         }
-        User user =(User) request.getSession().getAttribute(UserConstant.USER_LOGIN_STATE);
+        User user = (User) request.getSession().getAttribute(UserConstant.USER_LOGIN_STATE);
         if (user == null) {
             throw new BussinessException(Code.NOT_LOGIN);
         }
         return user;
+    }
+
+    @Override
+    public List<User> matchUsers(long num, User loginUser) {
+        List<User> userList = this.list();
+        String tags = loginUser.getTags();
+        Gson gson = new Gson();
+        List<String> tagList = gson.fromJson(tags, new TypeToken<List<String>>() {
+        }.getType());
+        SortedMap<Integer, Long> indexDistanceMap = new TreeMap<>();
+        for (int i = 0; i < userList.size(); i++) {
+            User user = userList.get(i);
+            String userTags = user.getTags();
+            if (StringUtils.isBlank(userTags)) {
+                continue;
+            }
+            List<String> userTagList = gson.fromJson(userTags, new TypeToken<List<String>>() {
+            }.getType());
+            int distance = AlgorithmUtils.minDistance(tagList, userTagList);
+            indexDistanceMap.put(i, (long) distance);
+        }
+        List<Integer> collect = indexDistanceMap.keySet().stream().limit(num).collect(Collectors.toList());
+        List<User> userVOList = collect.stream().
+                map(index -> getSafetyUser(userList.get(index)))
+                .collect(Collectors.toList());
+        return userVOList;
+
     }
 }
 

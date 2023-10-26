@@ -10,6 +10,7 @@ import com.yunfei.ikunfriend.exception.BussinessException;
 import com.yunfei.ikunfriend.model.domain.User;
 import com.yunfei.ikunfriend.model.dto.UserLoginDTO;
 import com.yunfei.ikunfriend.model.dto.UserRegisterDTO;
+import com.yunfei.ikunfriend.model.vo.UserVO;
 import com.yunfei.ikunfriend.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -146,5 +147,14 @@ public class UserController {
             log.error("redis set error:{}",e.getMessage());
         }
         return ResultUtils.success(userList);
+    }
+
+    @GetMapping("/match")
+    public Result<List<User>> matchUsers(long num, HttpServletRequest request){
+        if (num<=0 ||num>20){
+            throw new BussinessException(Code.PARAMS_ERROR);
+        }
+        User loginUser = userService.getLoginUser(request);
+        return ResultUtils.success(userService.matchUsers(num,loginUser));
     }
 }
