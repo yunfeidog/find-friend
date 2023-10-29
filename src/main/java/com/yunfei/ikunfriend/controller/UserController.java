@@ -10,8 +10,8 @@ import com.yunfei.ikunfriend.exception.BussinessException;
 import com.yunfei.ikunfriend.model.domain.User;
 import com.yunfei.ikunfriend.model.dto.UserLoginDTO;
 import com.yunfei.ikunfriend.model.dto.UserRegisterDTO;
-import com.yunfei.ikunfriend.model.vo.UserVO;
 import com.yunfei.ikunfriend.service.UserService;
+import io.swagger.annotations.Api;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -132,29 +132,36 @@ public class UserController {
     @GetMapping("/recommend")
     public Result<Page<User>> recommendUser(int pageSize, int pageNum, HttpServletRequest request) {
         User loginUser = userService.getLoginUser(request);
-        String redisKey=String.format("ikun:user:recommend:%s",loginUser.getId());
+        String redisKey = String.format("ikun:user:recommend:%s", loginUser.getId());
         ValueOperations valueOperations = redisTemplate.opsForValue();
         Page<User> userPage = (Page<User>) valueOperations.get(redisKey);
-        if (userPage!=null){
+        if (userPage != null) {
             log.info("get recommend user from redis");
             return ResultUtils.success(userPage);
         }
         QueryWrapper<User> queryWrapper = new QueryWrapper<>();
         Page<User> userList = userService.page(new Page<>(pageNum, pageSize), queryWrapper);
         try {
-            valueOperations.set(redisKey,userList,30, TimeUnit.MINUTES);
+            valueOperations.set(redisKey, userList, 30, TimeUnit.MINUTES);
         } catch (Exception e) {
-            log.error("redis set error:{}",e.getMessage());
+            log.error("redis set error:{}", e.getMessage());
         }
         return ResultUtils.success(userList);
     }
 
+    /**
+     * 获取最匹配的用户
+     *
+     * @param num
+     * @param request
+     * @return
+     */
     @GetMapping("/match")
-    public Result<List<User>> matchUsers(long num, HttpServletRequest request){
-        if (num<=0 ||num>20){
+    public Result<List<User>> matchUsers(long num, HttpServletRequest request) {
+        if (num <= 0 || num > 20) {
             throw new BussinessException(Code.PARAMS_ERROR);
         }
         User loginUser = userService.getLoginUser(request);
-        return ResultUtils.success(userService.matchUsers(num,loginUser));
+        return ResultUtils.success(userService.matchUsers(num, loginUser));
     }
 }

@@ -21,12 +21,15 @@ import com.yunfei.ikunfriend.service.UserTeamService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author houyunfei
@@ -43,6 +46,9 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
 
     @Resource
     private UserService userService;
+
+    @Resource
+    private RedissonClient redissonClient;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -148,8 +154,8 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
             if (status > -1) {
                 queryWrapper.eq("status", status);
             }
-            if (!isAdmin && !status.equals(TeamStatusEnum.PUBLIC)) {
-                throw new BussinessException(Code.PARAMS_ERROR, "只能查看公开的队伍");
+            if (!isAdmin && status.equals(TeamStatusEnum.PRIVATE)) {
+                throw new BussinessException(Code.PARAMS_ERROR, "只有管理员可以查看私有队伍");
             }
             String searchText = teamQueryDto.getSearchText();
             if (StringUtils.isNotBlank(searchText)) {
@@ -222,13 +228,6 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
         if (teamJoinDTO == null) {
             throw new BussinessException(Code.PARAMS_ERROR);
         }
-        Long userId = loginUser.getId();
-        QueryWrapper<UserTeam> userTeamQueryWrapper = new QueryWrapper<>();
-        userTeamQueryWrapper.eq("userId", userId);
-        long count = userTeamService.count(userTeamQueryWrapper);
-        if (count > 5) {
-            throw new BussinessException(Code.PARAMS_ERROR, "最多创建和加入五个队伍");
-        }
         Long teamId = teamJoinDTO.getTeamId();
         Team team = getTeamById(teamId);
         if (team.getExpireTime() != null && team.getExpireTime().before(new Date())) {
@@ -244,30 +243,53 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
             }
         }
 
-        //已加入队伍的人数
-        userTeamQueryWrapper = new QueryWrapper<>();
-        userTeamQueryWrapper.eq("teamId", teamId);
-        long count1 = userTeamService.count(userTeamQueryWrapper);
-        if (count1 >= team.getMaxNum()) {
-            throw new BussinessException(Code.PARAMS_ERROR, "队伍已满");
-        }
+        Long userId = loginUser.getId();
+        //分布式锁
+        RLock lock = redissonClient.getLock("ikun:join_team");
 
-        //不能重复加入已加入的队伍
-        userTeamQueryWrapper = new QueryWrapper<>();
-        userTeamQueryWrapper.eq("userId", userId);
-        userTeamQueryWrapper.eq("teamId", teamId);
-        long count2 = userTeamService.count(userTeamQueryWrapper);
-        if (count2 > 0) {
-            throw new BussinessException(Code.PARAMS_ERROR, "不能重复加入已加入的队伍");
-        }
+        try {
+            while (true) {
+                if (lock.tryLock(0, 30000, TimeUnit.MICROSECONDS)) {
+                    System.out.println("getLock" + Thread.currentThread().getId());
+                    QueryWrapper<UserTeam> userTeamQueryWrapper = new QueryWrapper<>();
+                    userTeamQueryWrapper.eq("userId", userId);
+                    long count = userTeamService.count(userTeamQueryWrapper);
+                    if (count > 5) {
+                        throw new BussinessException(Code.PARAMS_ERROR, "最多创建和加入五个队伍");
+                    }
+                    //不能重复加入已加入的队伍
+                    userTeamQueryWrapper = new QueryWrapper<>();
+                    userTeamQueryWrapper.eq("userId", userId);
+                    userTeamQueryWrapper.eq("teamId", teamId);
+                    long count2 = userTeamService.count(userTeamQueryWrapper);
+                    if (count2 > 0) {
+                        throw new BussinessException(Code.PARAMS_ERROR, "不能重复加入已加入的队伍");
+                    }
 
-        //插入用户=>队伍关系到关系表
-        UserTeam userTeam = new UserTeam();
-        userTeam.setUserId(userId);
-        userTeam.setTeamId(teamId);
-        userTeam.setJoinTime(new Date());
-        return userTeamService.save(userTeam);
+                    //已加入队伍的人数
+                    long count1 = countTeamUserByTeamId(teamId);
+                    if (count1 >= team.getMaxNum()) {
+                        throw new BussinessException(Code.PARAMS_ERROR, "队伍已满");
+                    }
+
+                    //插入用户=>队伍关系到关系表
+                    UserTeam userTeam = new UserTeam();
+                    userTeam.setUserId(userId);
+                    userTeam.setTeamId(teamId);
+                    userTeam.setJoinTime(new Date());
+                    return userTeamService.save(userTeam);
+                }
+            }
+        } catch (Exception e) {
+            throw new BussinessException(Code.SYSTEM_ERROR);
+        } finally {
+            //只能释放自己的锁
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
     }
+
 
     private Team getTeamById(Long teamId) {
         if (teamId == null || teamId <= 0) {

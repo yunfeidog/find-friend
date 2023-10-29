@@ -15,6 +15,7 @@ import com.yunfei.ikunfriend.service.UserService;
 import com.yunfei.ikunfriend.utils.AlgorithmUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.math3.util.Pair;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.DigestUtils;
@@ -272,29 +273,44 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
     @Override
     public List<User> matchUsers(long num, User loginUser) {
-        List<User> userList = this.list();
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        queryWrapper.select("id", "tags");
+        queryWrapper.isNotNull("tags");
+        List<User> userList = this.list(queryWrapper);
         String tags = loginUser.getTags();
         Gson gson = new Gson();
         List<String> tagList = gson.fromJson(tags, new TypeToken<List<String>>() {
         }.getType());
-        SortedMap<Integer, Long> indexDistanceMap = new TreeMap<>();
+        List<Pair<User, Long>> list = new ArrayList<>();
         for (int i = 0; i < userList.size(); i++) {
             User user = userList.get(i);
             String userTags = user.getTags();
-            if (StringUtils.isBlank(userTags)) {
+            //无标签或者是自己，跳过
+            if (StringUtils.isBlank(userTags) || user.getId().equals(loginUser.getId())) {
                 continue;
             }
             List<String> userTagList = gson.fromJson(userTags, new TypeToken<List<String>>() {
             }.getType());
             int distance = AlgorithmUtils.minDistance(tagList, userTagList);
-            indexDistanceMap.put(i, (long) distance);
+            list.add(new Pair<>(user, (long) distance));
         }
-        List<Integer> collect = indexDistanceMap.keySet().stream().limit(num).collect(Collectors.toList());
-        List<User> userVOList = collect.stream().
-                map(index -> getSafetyUser(userList.get(index)))
+        //按照编辑距离从小到达排序
+        List<Pair<User, Long>> topUserPairList = list.stream()
+                .sorted((a, b) -> (int) (a.getValue() - b.getValue()))
+                .limit(num)
                 .collect(Collectors.toList());
-        return userVOList;
-
+        List<Long> userIdList = topUserPairList.stream().map(userLongPair -> userLongPair.getKey().getId()).collect(Collectors.toList());
+        QueryWrapper<User> userQueryWrapper = new QueryWrapper<>();
+        userQueryWrapper.in("id", userIdList);
+        Map<Long, List<User>> userIdUserListMap = this.list(userQueryWrapper)
+                .stream()
+                .map(user -> getSafetyUser(user))
+                .collect(Collectors.groupingBy(User::getId));
+        List<User> finalUserList = new ArrayList<>();
+        for (Long userId : userIdList) {
+            finalUserList.add(userIdUserListMap.get(userId).get(0));
+        }
+        return finalUserList;
     }
 }
 
