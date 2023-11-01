@@ -1,11 +1,13 @@
 package com.yunfei.ikunfriend.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.yunfei.ikunfriend.common.Code;
-import com.yunfei.ikunfriend.common.UserConstant;
+import com.yunfei.ikunfriend.constant.RedisConstant;
+import com.yunfei.ikunfriend.constant.UserConstant;
 import com.yunfei.ikunfriend.exception.BussinessException;
 import com.yunfei.ikunfriend.mapper.UserMapper;
 import com.yunfei.ikunfriend.model.domain.User;
@@ -16,6 +18,8 @@ import com.yunfei.ikunfriend.utils.AlgorithmUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.math3.util.Pair;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.DigestUtils;
@@ -23,6 +27,7 @@ import org.springframework.util.DigestUtils;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -42,6 +47,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     @Resource
     private UserMapper userMapper;
 
+    @Resource
+    private RedisTemplate redisTemplate;
+
 
     /**
      * 根据标签搜索用户
@@ -54,7 +62,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         if (CollectionUtils.isEmpty(tagNameList)) {
             throw new BussinessException(Code.PARAMS_ERROR);
         }
-        //return searchUsersByTagsBySQL(tagNameList);
+        //在内存中计算结果
         return searchUsersByTagsByMemory(tagNameList);
     }
 
@@ -144,6 +152,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
         //插入数据
         User user = new User();
+        //查询现在最大的id是多少
+        String url = UserConstant.AVATAR_URL.get(new Random().nextInt(UserConstant.AVATAR_URL.size()));
+        user.setAvatarUrl(url);
+        user.setGender(new Random().nextInt(2) + 1);
         user.setUserAccount(userAccount);
         user.setUserPassword(encryptPassword);
         user.setIkunCode(ikunCode);
@@ -151,7 +163,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         if (result < 1) {
             throw new BussinessException(Code.SYSTEM_ERROR, "注册失败");
         }
-        return user.getId();
+        Long userId = user.getId();
+        String username = "无敌ikun" + userId + "号";
+        user.setUsername(username);
+        userMapper.updateById(user);
+        return userId;
     }
 
     @Override
@@ -273,6 +289,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
     @Override
     public List<User> matchUsers(long num, User loginUser) {
+//        List<User> users1 = matchUsersByListSorted(num, loginUser);
+        List<User> users = matchUsersByPriorityQueue(num, loginUser);
+        return users;
+    }
+
+    private List<User> matchUsersByListSorted(long num, User loginUser) {
         QueryWrapper<User> queryWrapper = new QueryWrapper<>();
         queryWrapper.select("id", "tags");
         queryWrapper.isNotNull("tags");
@@ -294,7 +316,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             int distance = AlgorithmUtils.minDistance(tagList, userTagList);
             list.add(new Pair<>(user, (long) distance));
         }
-        //按照编辑距离从小到达排序
+        //按照编辑距离从小到达排序 编辑距离越小说明相似度越高
         List<Pair<User, Long>> topUserPairList = list.stream()
                 .sorted((a, b) -> (int) (a.getValue() - b.getValue()))
                 .limit(num)
@@ -304,13 +326,73 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         userQueryWrapper.in("id", userIdList);
         Map<Long, List<User>> userIdUserListMap = this.list(userQueryWrapper)
                 .stream()
-                .map(user -> getSafetyUser(user))
+                .map(this::getSafetyUser)
                 .collect(Collectors.groupingBy(User::getId));
         List<User> finalUserList = new ArrayList<>();
         for (Long userId : userIdList) {
             finalUserList.add(userIdUserListMap.get(userId).get(0));
         }
         return finalUserList;
+    }
+
+    public List<User> matchUsersByPriorityQueue(long num, User loginUser) {
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        queryWrapper.select("id", "tags");
+        queryWrapper.isNotNull("tags");
+        // 获取所有用户列表
+        List<User> userList = this.list(queryWrapper);
+        // 获取登录用户的标签
+        String tags = loginUser.getTags();
+        Gson gson = new Gson();
+        List<String> tagList = gson.fromJson(tags, new TypeToken<List<String>>() {
+        }.getType());
+        // 创建一个优先队列，按照距离进行排序
+        PriorityQueue<Pair<User, Long>> priorityQueue = new PriorityQueue<>(Comparator.comparing(Pair::getValue));
+        // 遍历所有用户，计算距离并加入优先队列
+        for (User user : userList) {
+            String userTags = user.getTags();
+            if (StringUtils.isBlank(userTags) || user.getId().equals(loginUser.getId())) {
+                continue;
+            }
+            List<String> userTagList = gson.fromJson(userTags, new TypeToken<List<String>>() {
+            }.getType());
+            int distance = AlgorithmUtils.minDistance(tagList, userTagList);
+            priorityQueue.offer(new Pair<>(user, (long) distance));
+
+            // 保持优先队列的大小不超过 num
+            if (priorityQueue.size() > num) {
+                priorityQueue.poll();
+            }
+        }
+        // 创建一个列表以存储最终的用户
+        List<User> finalUserList = new ArrayList<>(priorityQueue.size());
+        // 从优先队列中提取前 num个用户
+        while (!priorityQueue.isEmpty()) {
+            finalUserList.add(priorityQueue.poll().getKey());
+        }
+        // 反转列表以得到前 num 个匹配用户
+        Collections.reverse(finalUserList);
+        return finalUserList;
+    }
+
+
+    @Override
+    public Page<User> recommendUser(int pageSize, int pageNum, User loginUser) {
+        String redisKey = String.format("%s%s", RedisConstant.USER_RECOMMEND, loginUser.getId());
+        ValueOperations valueOperations = redisTemplate.opsForValue();
+        Page<User> userPage = (Page<User>) valueOperations.get(redisKey);
+        if (userPage != null) {
+            log.info("get recommend user from redis");
+            return userPage;
+        }
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        Page<User> userList = this.page(new Page<>(pageNum, pageSize), queryWrapper);
+        try {
+            valueOperations.set(redisKey, userList, 30, TimeUnit.MINUTES);
+        } catch (Exception e) {
+            log.error("redis set error:{}", e.getMessage());
+        }
+        return userList;
     }
 }
 

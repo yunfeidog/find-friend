@@ -1,5 +1,6 @@
 package com.yunfei.ikunfriend.service;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.yunfei.ikunfriend.model.domain.User;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.yunfei.ikunfriend.model.dto.UserLoginDTO;
@@ -15,6 +16,11 @@ import java.util.List;
  */
 public interface UserService extends IService<User> {
 
+    /**
+     * 按照标签搜索用户
+     * @param tagNameList  标签名列表
+     * @return
+     */
     List<User> searchUsersByTags(List<String> tagNameList);
 
     /**
@@ -61,6 +67,7 @@ public interface UserService extends IService<User> {
 
 
     boolean isAdmin(User loginUser);
+
     boolean isAdmin(HttpServletRequest request);
 
 
@@ -72,5 +79,21 @@ public interface UserService extends IService<User> {
     User getLoginUser(HttpServletRequest request);
 
 
+    /**
+     * 获取最匹配的用户
+     * @param num
+     * @param loginUser
+     * @return
+     */
     List<User> matchUsers(long num, User loginUser);
+
+    /**
+     * 用户 推荐算法
+     *
+     * @param pageSize
+     * @param pageNum
+     * @param loginUser
+     * @return
+     */
+    Page<User> recommendUser(int pageSize, int pageNum, User loginUser);
 }

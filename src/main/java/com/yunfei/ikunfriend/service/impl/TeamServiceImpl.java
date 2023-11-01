@@ -3,7 +3,7 @@ package com.yunfei.ikunfriend.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yunfei.ikunfriend.common.Code;
-import com.yunfei.ikunfriend.common.TeamStatusEnum;
+import com.yunfei.ikunfriend.constant.TeamStatusEnum;
 import com.yunfei.ikunfriend.exception.BussinessException;
 import com.yunfei.ikunfriend.mapper.TeamMapper;
 import com.yunfei.ikunfriend.model.domain.Team;

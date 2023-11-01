@@ -1,4 +1,4 @@
-package com.yunfei.ikunfriend.common;
+package com.yunfei.ikunfriend.constant;
 
 public interface TeamStatusEnum {
     int PUBLIC = 0;
