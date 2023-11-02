@@ -87,6 +87,10 @@ public interface UserService extends IService<User> {
      */
     List<User> matchUsers(long num, User loginUser);
 
+    List<User> matchUsersByListSorted(long num, User loginUser);
+
+    List<User> matchUsersByPriorityQueue(long num, User loginUser);
+
     /**
      * 用户 推荐算法
      *

@@ -289,12 +289,24 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
     @Override
     public List<User> matchUsers(long num, User loginUser) {
+        //先查一次数据库，防止数据库连接耗时。影响了下面的对比
+//        this.getById(loginUser.getId());
+//        long startTime1 = System.currentTimeMillis();
 //        List<User> users1 = matchUsersByListSorted(num, loginUser);
-        List<User> users = matchUsersByPriorityQueue(num, loginUser);
-        return users;
+//        long endTime1 = System.currentTimeMillis();
+//        long executionTime1 = endTime1 - startTime1;
+//        long startTime2 = System.currentTimeMillis();
+//        List<User> users2 = matchUsersByPriorityQueue(num, loginUser);
+//        long endTime2 = System.currentTimeMillis();
+//        long executionTime2 = endTime2 - startTime2;
+//        log.info("使用list排序耗时：{}ms,使用优先队列耗时：{}ms,差距：{}ms,优化比例：{}%",
+//                executionTime1, executionTime2, executionTime1 - executionTime2,
+//                (executionTime1 - executionTime2) * 100 / executionTime1);
+        return matchUsersByPriorityQueue(num, loginUser);
     }
 
-    private List<User> matchUsersByListSorted(long num, User loginUser) {
+    @Override
+    public List<User> matchUsersByListSorted(long num, User loginUser) {
         QueryWrapper<User> queryWrapper = new QueryWrapper<>();
         queryWrapper.select("id", "tags");
         queryWrapper.isNotNull("tags");
@@ -335,6 +347,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         return finalUserList;
     }
 
+    @Override
     public List<User> matchUsersByPriorityQueue(long num, User loginUser) {
         QueryWrapper<User> queryWrapper = new QueryWrapper<>();
         queryWrapper.select("id", "tags");
@@ -346,8 +359,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         Gson gson = new Gson();
         List<String> tagList = gson.fromJson(tags, new TypeToken<List<String>>() {
         }.getType());
-        // 创建一个优先队列，按照距离进行排序
-        PriorityQueue<Pair<User, Long>> priorityQueue = new PriorityQueue<>(Comparator.comparing(Pair::getValue));
+        // 创建一个优先队列，按照距离进行排序 队列始终保持最小距离的用户,每次删除编辑距离值最大的那个
+        PriorityQueue<Pair<User, Long>> priorityQueue = new PriorityQueue<>((a, b) -> (int) (b.getValue() - a.getValue()));
         // 遍历所有用户，计算距离并加入优先队列
         for (User user : userList) {
             String userTags = user.getTags();
@@ -358,21 +371,23 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             }.getType());
             int distance = AlgorithmUtils.minDistance(tagList, userTagList);
             priorityQueue.offer(new Pair<>(user, (long) distance));
-
             // 保持优先队列的大小不超过 num
             if (priorityQueue.size() > num) {
                 priorityQueue.poll();
             }
         }
-        // 创建一个列表以存储最终的用户
-        List<User> finalUserList = new ArrayList<>(priorityQueue.size());
-        // 从优先队列中提取前 num个用户
-        while (!priorityQueue.isEmpty()) {
-            finalUserList.add(priorityQueue.poll().getKey());
-        }
-        // 反转列表以得到前 num 个匹配用户
-        Collections.reverse(finalUserList);
-        return finalUserList;
+        //获取id列表
+        List<Long> matchUserIds = priorityQueue.stream()
+                .map(userLongPair -> userLongPair.getKey().getId())
+                .collect(Collectors.toList());
+        QueryWrapper<User> userQueryWrapper = new QueryWrapper<>();
+        userQueryWrapper.in("id", matchUserIds);
+        List<User> users = this.list(userQueryWrapper)
+                .stream()
+                .map(this::getSafetyUser)
+                .collect(Collectors.toList());
+
+        return users;
     }
 
 

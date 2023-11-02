@@ -16,9 +16,9 @@ public class GlobalExceptionHandler {
         return ResultUtils.error(e.getCode(), e.getMessage(), e.getDescription());
     }
 
-    @ExceptionHandler(RuntimeException.class)
+    @ExceptionHandler(Exception.class)
     public Result runtimeExceptionHandler(RuntimeException e) {
         log.error("runtimeException", e);
-        return ResultUtils.error(Code.SYSTEM_ERROR, e.getMessage(), "");
+        return ResultUtils.error(Code.SYSTEM_ERROR, e.getMessage(), "系统异常");
     }
 }
