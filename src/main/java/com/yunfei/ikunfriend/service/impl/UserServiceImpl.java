@@ -18,6 +18,7 @@ import com.yunfei.ikunfriend.utils.AlgorithmUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.math3.util.Pair;
+import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Service;
@@ -205,6 +206,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         }
         //用户脱敏
         User safetyUser = getSafetyUser(user);
+
+        //将用户信息存储在Hash中，key为用户id，value为用户信息
+        String sessionKey = "session" + request.getSession().getId();
+        HashOperations<String, String, Object> hashOperations = redisTemplate.opsForHash();
+        hashOperations.put(sessionKey, RedisConstant.USER_HASH_KEY, safetyUser);
         //记录用户登录态
         request.getSession().setAttribute(UserConstant.USER_LOGIN_STATE, user);
         return safetyUser;
@@ -393,20 +399,20 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
     @Override
     public Page<User> recommendUser(int pageSize, int pageNum, User loginUser) {
-        String redisKey = String.format("%s%s", RedisConstant.USER_RECOMMEND, loginUser.getId());
-        ValueOperations valueOperations = redisTemplate.opsForValue();
-        Page<User> userPage = (Page<User>) valueOperations.get(redisKey);
-        if (userPage != null) {
-            log.info("get recommend user from redis");
-            return userPage;
-        }
+//        String redisKey = String.format("%s%s", RedisConstant.USER_RECOMMEND, loginUser.getId());
+//        ValueOperations valueOperations = redisTemplate.opsForValue();
+//        Page<User> userPage = (Page<User>) valueOperations.get(redisKey);
+//        if (userPage != null) {
+//            log.info("get recommend user from redis");
+//            return userPage;
+//        }
         QueryWrapper<User> queryWrapper = new QueryWrapper<>();
         Page<User> userList = this.page(new Page<>(pageNum, pageSize), queryWrapper);
-        try {
-            valueOperations.set(redisKey, userList, 30, TimeUnit.MINUTES);
-        } catch (Exception e) {
-            log.error("redis set error:{}", e.getMessage());
-        }
+//        try {
+//            valueOperations.set(redisKey, userList, 30, TimeUnit.MINUTES);
+//        } catch (Exception e) {
+//            log.error("redis set error:{}", e.getMessage());
+//        }
         return userList;
     }
 }

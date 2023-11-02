@@ -20,7 +20,7 @@ target/
 *.ipr
 
 # 排除 test目录
-!src/test/**
+#!src/test/**
 
 ### NetBeans ###
 /nbproject/private/

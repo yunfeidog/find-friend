@@ -246,7 +246,6 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
         Long userId = loginUser.getId();
         //分布式锁
         RLock lock = redissonClient.getLock("ikun:join_team");
-
         try {
             while (true) {
                 if (lock.tryLock(0, 30000, TimeUnit.MICROSECONDS)) {
