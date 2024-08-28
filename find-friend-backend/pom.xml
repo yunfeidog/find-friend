@@ -9,10 +9,10 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.yunfei</groupId>
-    <artifactId>ikunfriend-back</artifactId>
+    <artifactId>find-friend-backend</artifactId>
     <version>0.0.1</version>
-    <name>ikunfriend-back</name>
-    <description>ikunfriend-back</description>
+    <name>find-friend-backend</name>
+    <description>find-friend-backend</description>
     <properties>
         <java.version>1.8</java.version>
         <maven.compiler.source>1.8</maven.compiler.source>
